@@ -7,23 +7,26 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import os
 
-# Configuração
-st.set_page_config(page_title="Agente Marketing Fast Food", layout="wide")
-st.title("Carlos Vega - Consultor de Marketing de Fast Food")
+# Configuração da página
+st.set_page_config(page_title="🍔 Agente Marketing Fast Food", layout="wide")
+st.title("👨‍💼 Carlos Vega - Consultor de Marketing de Fast Food")
 
 st.markdown("""
-> 'O cardapio e a sua vitrine. Se nao vende desejo, esta vendendo menos.'  
-> -- Carlos Vega
+> 'O cardápio é a sua vitrine. Se não vende desejo, está vendendo menos.'  
+> — Carlos Vega
 """)
 
-# Carregar historico
+# Carregar histórico
 if "historico" not in st.session_state:
     if os.path.exists("historico.csv"):
-        st.session_state.historico = pd.read_csv("historico.csv")
+        try:
+            st.session_state.historico = pd.read_csv("historico.csv")
+        except pd.errors.EmptyDataError:
+            st.session_state.historico = pd.DataFrame(columns=["nome", "itens", "data"])
     else:
         st.session_state.historico = pd.DataFrame(columns=["nome", "itens", "data"])
 
-# Funcoes
+# Funções de leitura
 def ler_csv_ou_excel(uploaded_file):
     try:
         if uploaded_file.name.endswith(".csv"):
@@ -41,7 +44,7 @@ def ler_pdf(uploaded_file):
         texto = ""
         for page in reader.pages:
             texto += page.extract_text() + "\n"
-        return texto
+        return texto.strip()
     except Exception as e:
         st.error(f"Erro ao ler PDF: {e}")
         return None
@@ -61,7 +64,7 @@ def extrair_de_link(url):
         st.error(f"Erro ao acessar o link: {e}")
         return None
 
-# --- Interface ---
+# Interface de upload
 st.subheader("📥 Envie seu cardápio (PDF, Planilha ou Link)")
 input_type = st.radio("Como deseja enviar?", [
     "📤 Enviar arquivo (PDF, Excel, CSV)",
@@ -78,10 +81,10 @@ if input_type == "📤 Enviar arquivo (PDF, Excel, CSV)":
             raw_text = ler_pdf(uploaded_file)
             if raw_text:
                 st.success("✅ PDF carregado!")
-                with st.expander("🔍 Ver texto extraído do PDF"):
-                    st.text_area("Texto encontrado", raw_text[:2000], height=300)
+                with st.expander("🔍 Ver texto extraído"):
+                    st.text_area("Conteúdo", raw_text[:2000], height=300)
             else:
-                st.error("❌ Não foi possível extrair texto do PDF.")
+                st.error("❌ Falha ao extrair texto do PDF.")
         else:
             df = ler_csv_ou_excel(uploaded_file)
             if df is not None:
@@ -93,16 +96,13 @@ elif input_type == "🔗 Colar link do cardápio online":
         raw_text = extrair_de_link(url)
         if raw_text:
             st.success("✅ Página carregada!")
-            # Descomente abaixo se quiser ver o texto extraído do link
-            # with st.expander("Ver conteúdo da página"):
-            #     st.text_area("Texto", raw_text[:2000], height=300)
 
 # --- Processar dados ---
 produtos = []
 
 if df is not None:
-    # Tratar planilha (CSV ou Excel)
-    df.columns = [c.lower().replace('ç', 'c').replace('ã', 'a').replace('ó', 'o') for c in df.columns]
+    # Padronizar colunas
+    df.columns = [str(c).lower().replace('ç', 'c').replace('ã', 'a').replace('ó', 'o') for c in df.columns]
     nome_col = 'nome' if 'nome' in df.columns else df.columns[0]
     preco_col = 'preco' if 'preco' in df.columns else 'preço' if 'preço' in df.columns else df.columns[1]
     desc_col = 'descricao' if 'descricao' in df.columns else 'descrição' if 'descrição' in df.columns else None
@@ -115,37 +115,27 @@ if df is not None:
         })
 
 elif raw_text:
-    # Extrair produtos do texto do PDF
     linhas = [linha.strip() for linha in raw_text.split('\n') if linha.strip()]
     i = 0
     while i < len(linhas):
         linha = linhas[i]
-
-        # Procurar "R$" seguido de valor
         if 'R$' in linha or 'r$' in linha:
             preco_part = None
-            # Verificar se o preço está na mesma linha
             if any(c.isdigit() for c in linha):
                 preco_part = linha
-            # Ou na próxima linha
             elif i + 1 < len(linhas) and any(c.isdigit() for c in linhas[i+1]):
                 preco_part = linhas[i+1]
-                i += 1  # pular a linha do preço
-
+                i += 1
             preco = preco_part.replace('R$', '').replace('r$', '').strip() if preco_part else "???"
 
-            # Procurar nome nas próximas linhas
             nome_candidato = ""
             for j in range(i+1, min(i+6, len(linhas))):
                 prox = linhas[j]
-                # Ignorar linhas de detalhe
-                if any(x in prox.lower() for x in ['/', 'pedaço', 'fatia', 'sabor', 'acompanha', 'broto']):
+                if any(x in prox.lower() for x in ['/', 'pedaço', 'fatia', 'sabor', 'acompanha']):
                     continue
-                # Se tem texto bom, usa como nome
                 if len(prox) > 10 and not prox.replace(",", "").replace(".", "").isdigit():
                     nome_candidato = prox
                     break
-
             if not nome_candidato:
                 nome_candidato = "Item detectado"
 
@@ -154,64 +144,83 @@ elif raw_text:
                 "preco": f"R$ {preco}",
                 "descricao": f"{nome_candidato} - R$ {preco}"
             })
-            i += 6  # pular para evitar duplicação
+            i += 6
         else:
             i += 1
 
-# Mostrar resultados
+# --- Mostrar e analisar com IA (Google Gemini) ---
 if produtos:
-    st.subheader("Produtos Encontrados")
+    st.subheader("🔍 Produtos Encontrados")
     st.dataframe(pd.DataFrame(produtos))
 
-    if st.button("Gerar Analise de Marketing"):
-        st.subheader("Relatorio do Especialista: Carlos Vega")
-        st.markdown(f"""
-        ### Diagnostico Geral do Cardapio
+    if st.button("🎯 Gerar Análise de Marketing com IA"):
+        st.subheader("🧠 Relatório do Especialista: Carlos Vega (com IA real)")
 
-        Seu cardapio tem **{len(produtos)} itens**.
+        lista_itens = "\n".join([f"• {p['nome']} | {p['preco']}" for p in produtos[:20]])
+        prompt = f"""
+Você é Carlos Vega, especialista em marketing de fast food com 20 anos de experiência.
+Analise este cardápio com {len(produtos)} itens:
 
-        - **Nomes dos produtos:** Funcionais, mas sem emocao.
-          Ex: "{produtos[0]['nome']}" -> precisa de mais desejo.
+{lista_itens}
 
-        - **Dicas de melhoria:**
-          1. **Nomes marcantes:**
-             - "Hamburguer com Queijo" -> "Cheddar Turbo"
-             - "Refrigerante" -> "Gelo Total"
+Dê:
+1. Crítica direta dos nomes — são atrativos?
+2. 3 sugestões de nomes poderosos (ex: 'Bacon Turbo', 'Cheddar Flame')
+3. Uma descrição emocional com gatilhos mentais
+4. Dica de combo ou upsell
+5. Exemplo de rede que faz bem isso (ex: Madero, Burguer King)
 
-          2. **Descricoes que vendem:**
-             "Nosso {produtos[0]['nome']} e grelhado na hora, com queijo derretido e molho secreto."
+Fale com autoridade, em português, máximo 200 palavras.
+"""
 
-          3. **Crie combos:** Aumente o ticket medio.
+        try:
+            import google.generativeai as genai
 
-          4. **Posicionamento de preco:** Destaque qualidade ou economia.
+            with st.spinner("Carlos Vega está analisando com inteligência artificial..."):
 
-          5. **Inspire-se:** Burguer King (nomes fortes), Giraffas (historias).
+                # 🔑 Chave de API do Gemini
+                # ⚠️ Recomendado: use Secrets no Streamlit Cloud
+                try:
+                    api_key = st.secrets["GEMINI_API_KEY"]
+                except:
+                    api_key = "SUA_CHAVE_AQUI"  # 👈 COLE SUA CHAVE AQUI (temporário)
 
-        ### Conclusao
+                genai.configure(api_key=api_key)
+                model = genai.GenerativeModel('gemini-pro')
+                response = model.generate_content(prompt)
 
-        Voce tem um bom cardapio, mas ele nao esta vendendo desejo.
-        Pequenas mudancas podem aumentar suas vendas em 20% ou mais.
-        """)
+                if response.text:
+                    st.markdown(f"> {response.text}")
+                else:
+                    st.error("❌ A IA não conseguiu gerar uma resposta.")
 
-        # Salvar no historico
-        novo = pd.DataFrame([{
-            "nome": "Cardapio analisado",
+        except Exception as e:
+            st.error(f"❌ Erro ao conectar com Gemini: {e}")
+            st.info("""
+            🔧 Solução:
+            1. Obtenha sua chave em: https://aistudio.google.com/app/apikey
+            2. Adicione no `st.secrets` ou substitua `SUA_CHAVE_AQUI`
+            """)
+
+        # Salvar no histórico
+        novo_registro = pd.DataFrame([{
+            "nome": "Análise com IA",
             "itens": len(produtos),
             "data": datetime.now().strftime("%Y-%m-%d %H:%M")
         }])
-        st.session_state.historico = pd.concat([st.session_state.historico, novo], ignore_index=True)
+        st.session_state.historico = pd.concat([st.session_state.historico, novo_registro], ignore_index=True)
         st.session_state.historico.to_csv("historico.csv", index=False)
 
-# Sidebar
-st.sidebar.subheader("Historico")
+# --- Sidebar ---
+st.sidebar.subheader("📌 Histórico de Análises")
 if not st.session_state.historico.empty:
     st.sidebar.dataframe(st.session_state.historico[["nome", "itens", "data"]])
 else:
-    st.sidebar.info("Nenhuma analise feita.")
+    st.sidebar.info("Nenhuma análise feita ainda.")
 
-st.sidebar.subheader("Feedback")
-util = st.sidebar.radio("Util?", ["", "Sim", "Nao"], index=0)
-if util == "Sim":
-    st.sidebar.success("Obrigado pelo feedback!")
-elif util == "Nao":
-    st.sidebar.warning("Vamos melhorar!")
+st.sidebar.subheader("🧠 Ajude o agente a evoluir")
+feedback = st.sidebar.radio("Essa análise foi útil?", ["", "Sim", "Não"], index=0)
+if feedback == "Sim":
+    st.sidebar.success("Obrigado! Isso ajuda o Carlos Vega a melhorar.")
+elif feedback == "Não":
+    st.sidebar.warning("Vamos ajustar para a próxima!")
