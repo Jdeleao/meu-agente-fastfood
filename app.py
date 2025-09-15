@@ -183,7 +183,7 @@ Fale com autoridade, em português, máximo 200 palavras.
                 try:
                     api_key = st.secrets["GEMINI_API_KEY"]
                 except:
-                    api_key = "SUA_CHAVE_AQUI"  # 👈 COLE SUA CHAVE AQUI (temporário)
+                    api_key = "AIzaSyAthybXPNx3oT5AWw9INwOX9A6BT10OEao"  # 👈 COLE SUA CHAVE AQUI (temporário)
 
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel('gemini-pro')
@@ -199,7 +199,7 @@ Fale com autoridade, em português, máximo 200 palavras.
             st.info("""
             🔧 Solução:
             1. Obtenha sua chave em: https://aistudio.google.com/app/apikey
-            2. Adicione no `st.secrets` ou substitua `SUA_CHAVE_AQUI`
+            2. Adicione no `st.secrets` ou substitua `AIzaSyAthybXPNx3oT5AWw9INwOX9A6BT10OEao`
             """)
 
         # Salvar no histórico
@@ -224,3 +224,4 @@ if feedback == "Sim":
     st.sidebar.success("Obrigado! Isso ajuda o Carlos Vega a melhorar.")
 elif feedback == "Não":
     st.sidebar.warning("Vamos ajustar para a próxima!")
+
