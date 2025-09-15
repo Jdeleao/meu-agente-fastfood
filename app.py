@@ -181,7 +181,7 @@ Fale com autoridade, em português, máximo 200 palavras.
                 # 🔑 Chave de API do Gemini
                 # ⚠️ Recomendado: use Secrets no Streamlit Cloud
                 try:
-                    api_key = st.secrets["GEMINI_API_KEY"]
+                    api_key = st.secrets["AIzaSyAthybXPNx3oT5AWw9INwOX9A6BT10OEao"]
                 except:
                     api_key = "AIzaSyAthybXPNx3oT5AWw9INwOX9A6BT10OEao"  # 👈 COLE SUA CHAVE AQUI (temporário)
 
@@ -224,4 +224,5 @@ if feedback == "Sim":
     st.sidebar.success("Obrigado! Isso ajuda o Carlos Vega a melhorar.")
 elif feedback == "Não":
     st.sidebar.warning("Vamos ajustar para a próxima!")
+
 
